@@ -1,0 +1,38 @@
+{
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "execute_bash",
+        "description": "在本地终端执行一条 bash 命令并返回字符串输出结果",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string",
+              "description": "要执行的 bash 命令"
+            }
+          },
+          "required": ["command"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "search_tool",
+        "description": "进行联网搜索并返回json格式的字符串搜索结果",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "target": {
+              "type": "string",
+              "description": "要联网搜索的对象的描述"
+            }
+          },
+          "required": ["target"]
+        }
+      }
+    }
+  ]
+}
