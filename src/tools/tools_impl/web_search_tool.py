@@ -3,7 +3,7 @@ import json
 import os
 
 
-WEB_SEARCH_API_KEY = os.environ.get("TAIL_API_KEY")
+WEB_SEARCH_API_KEY = os.environ.get("TAVIL_API_KEY")
 
 # 工具 schema 定义
 tools = [
