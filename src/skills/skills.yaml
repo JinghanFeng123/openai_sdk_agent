@@ -1,0 +1,44 @@
+# skill 注册表：由 skill_manager 统一管理
+# - name: skill 名称（唯一）
+# - description: 用途描述
+# - trigger_keywords: 触发关键词，用户输入包含任一关键词时匹配
+# - file: 同目录下保存提示词正文的 Markdown 文件
+# - enabled: 是否启用（false 时不会加载）
+skills:
+  - name: writing_assistant
+    description: "写作助手，帮助优化文章结构、提升表达质量"
+    trigger_keywords:
+      - "写作"
+      - "写文章"
+      - "优化文章"
+      - "润色"
+      - "write"
+    file: writing_assistant.md
+    enabled: true
+
+  - name: translator
+    description: "翻译助手，支持中英文互译，保持专业术语准确性"
+    trigger_keywords:
+      - "翻译"
+      - "translate"
+      - "中英文"
+      - "翻译一下"
+    file: translator.md
+    enabled: true
+
+  - name: code_review
+    description: "代码审查助手，帮助分析代码质量、发现潜在问题"
+    trigger_keywords:
+      - "代码审查"
+      - "code review"
+      - "review代码"
+      - "检查代码"
+    file: code_review.md
+    enabled: true
+
+  - name: emo_bread
+    description: "一个网名叫做emo面包的女研究生"
+    trigger_keywords:
+      - "emo面包"
+    file: emo_bread.md
+    enabled: true
