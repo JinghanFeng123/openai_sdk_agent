@@ -1,8 +1,10 @@
 import os
+import json
 from openai import OpenAI
 from dotenv import load_dotenv
 from tool_registry import ToolRegistry
 from skill_manager import skill_manager
+from agent_state import AgentState
 
 # 加载环境变量（脚本所在目录下的 .env，保证从任意目录启动都能读到）
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
@@ -34,19 +36,21 @@ for tool in tools:
 skills_dir = os.path.join(os.path.dirname(__file__), "skills")
 skill_manager.load_skills(skills_dir)
 print(f"✅ 已加载 {skill_manager.get_skill_count()} 个 skills:")
-for skill in skill_manager._skills.values():
+for skill in skill_manager.get_all_skills():
     print(f"  - {skill.name}: {skill.description}")
 
-# 消息历史
-messages = [
-    {
-        "role": "system",
-        "content": "你是一个智能助手，可以使用各种工具帮助用户完成任务。"
-    }
-]
+BASE_SYSTEM_PROMPT = "你是一个智能助手，可以使用各种工具帮助用户完成任务。"
 
-# 当前激活的 skill（用于动态更新 system prompt）
-current_skill = None
+
+def build_system_prompt(skill=None) -> str:
+    """构造 system 提示词：激活 skill 时注入 skill prompt，否则列出所有可用 skills"""
+    if skill:
+        return f"{BASE_SYSTEM_PROMPT}\n\n当前激活的 skill: {skill.name}\n{skill.prompt}"
+    return f"{BASE_SYSTEM_PROMPT}\n\n{skill_manager.get_all_skills_info()}"
+
+
+# Agent 运行时状态（消息历史、当前 skill、工具调用结果等）
+state = AgentState(messages=[{"role": "system", "content": BASE_SYSTEM_PROMPT}])
 
 def chat_loop():
     """主对话循环"""
@@ -62,26 +66,40 @@ def chat_loop():
         if not user_input:
             continue
         
-        messages.append({"role": "user", "content": user_input})
+        # 开始新一轮对话，记录用户输入并清理上一轮工具状态
+        state.begin_turn(user_input)
+        state.add_message("user", user_input)
         
         # 检查是否匹配 skill
         matched_skill = skill_manager.match_skill(user_input)
         if matched_skill:
-            print(f"🎯 [Skill 激活] {matched_skill.name}")
-            # 动态更新 system prompt，加入 skill 的 prompt
-            messages[0]["content"] = f"你是一个智能助手，可以使用各种工具帮助用户完成任务。\n\n当前激活的 skill: {matched_skill.name}\n{matched_skill.prompt}"
+            # 人工确认环节：展示 skill 信息，由用户决定是否激活
+            print(f"\n🎯 检测到可用的 skill: {matched_skill.name}")
+            print(f"   描述: {matched_skill.description}")
+            confirm = input("是否激活该 skill？(y/n): ").strip().lower()
+            if confirm == 'y':
+                print(f"✅ [Skill 激活] {matched_skill.name}")
+                # 动态更新 system prompt，加入 skill 的 prompt
+                state.current_skill = matched_skill
+                state.set_system_prompt(build_system_prompt(matched_skill))
+            else:
+                print("⏭️ 跳过 skill，使用默认助手模式")
+                # 未激活 skill，恢复基础 system prompt
+                state.current_skill = None
+                state.set_system_prompt(build_system_prompt())
         else:
             # 没有匹配 skill，恢复基础 system prompt
-            messages[0]["content"] = f"你是一个智能助手，可以使用各种工具帮助用户完成任务。\n\n{skill_manager.get_all_skills_info()}"
+            state.current_skill = None
+            state.set_system_prompt(build_system_prompt())
         
-        print(f"\n🤖 [思考中] 当前对话历史: {len(messages)} 条消息")
+        print(f"\n🤖 [思考中] 当前对话历史: {len(state.messages)} 条消息")
         
         # 工具调用循环（可能多次）
         while True:
             try:
                 response = client.chat.completions.create(
                     model="qwen-max",
-                    messages=messages,
+                    messages=state.messages,
                     tools=tools if tools else None,
                     stream=True
                 )
@@ -126,10 +144,7 @@ def chat_loop():
                 
                 # 如果没有工具调用，说明是最终回复
                 if not tool_calls_data:
-                    messages.append({
-                        "role": "assistant",
-                        "content": full_content
-                    })
+                    state.add_message("assistant", full_content)
                     break
                 
                 # 有工具调用，构造 assistant 消息
@@ -137,12 +152,8 @@ def chat_loop():
                 for idx in sorted(tool_calls_data.keys()):
                     tool_calls_list.append(tool_calls_data[idx])
                 
-                assistant_message = {
-                    "role": "assistant",
-                    "content": full_content if full_content else None,
-                    "tool_calls": tool_calls_list
-                }
-                messages.append(assistant_message)
+                state.add_message("assistant", full_content if full_content else None, tool_calls=tool_calls_list)
+                state.begin_tool_calls(tool_calls_list)
                 
                 # 执行每个工具调用
                 print(f"\n🔧 [工具调用] 检测到 {len(tool_calls_list)} 个工具调用")
@@ -156,7 +167,6 @@ def chat_loop():
                     
                     # 解析参数
                     try:
-                        import json
                         args = json.loads(args_str) if args_str else {}
                     except json.JSONDecodeError:
                         args = {}
@@ -167,12 +177,18 @@ def chat_loop():
                     result = registry.execute(func_name, args)
                     print(f"   ✅ 执行结果: {result[:200]}..." if len(result) > 200 else f"   ✅ 执行结果: {result}")
                     
-                    # 将结果添加到消息历史
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call["id"],
-                        "content": result
-                    })
+                    # 记录工具执行结果到 state（并同步写入对话历史）
+                    ok = not result.startswith(("执行出错", "未知工具", "工具执行错误"))
+                    state.record_tool_result(
+                        tool_call_id=tool_call["id"],
+                        name=func_name,
+                        arguments=args,
+                        result=result,
+                        ok=ok,
+                    )
+                
+                # 清理本轮等待中的工具调用
+                state.end_tool_calls()
                 
                 # 继续循环，让模型处理工具结果
                 
