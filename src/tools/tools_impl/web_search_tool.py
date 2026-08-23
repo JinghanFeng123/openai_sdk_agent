@@ -5,8 +5,27 @@ import os
 
 WEB_SEARCH_API_KEY = os.environ.get("TAIL_API_KEY")
 
+# 工具 schema 定义
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "search_tool",
+            "description": "进行联网搜索并返回搜索结果",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "target": {"type": "string", "description": "要联网搜索的对象"}
+                },
+                "required": ["target"]
+            }
+        }
+    }
+]
+
+
 # 联网搜索工具的实际执行函数
-def web_search(target: str) -> str:
+def search_tool(target: str) -> str:
     try:
         client = TavilyClient(WEB_SEARCH_API_KEY)
         response = client.search(
@@ -22,4 +41,4 @@ def web_search(target: str) -> str:
 
 
 if __name__ == "__main__":
-    print(web_search("https://www.tiktok.com/@israelarguetaa"))
+    print(search_tool("https://www.tiktok.com/@israelarguetaa"))

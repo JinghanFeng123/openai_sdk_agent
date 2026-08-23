@@ -20,6 +20,62 @@
     {
       "type": "function",
       "function": {
+        "name": "todo_write",
+        "description": "创建待办事项清单。当需要执行复杂任务时，先将任务拆解为多个子任务，生成清单展示给用户。",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "todos": {
+              "type": "array",
+              "description": "待办事项列表",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "description": "任务描述"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["pending", "in_progress", "completed"],
+                    "description": "任务状态，默认 pending"
+                  }
+                },
+                "required": ["content"]
+              }
+            }
+          },
+          "required": ["todos"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "todo_update",
+        "description": "更新待办事项的状态。使用 todo_id 指定要更新的任务，status 指定新状态。",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "todo_id": {
+              "type": "integer",
+              "description": "要更新的任务 ID（从 todo_write 返回的清单中获取）"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["pending", "in_progress", "completed"],
+              "description": "新的任务状态"
+            }
+          },
+          "required": ["todo_id", "status"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
         "name": "search_tool",
         "description": "进行联网搜索并返回json格式的字符串搜索结果",
         "parameters": {

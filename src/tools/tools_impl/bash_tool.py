@@ -1,6 +1,25 @@
 import subprocess
 
 
+# 工具 schema 定义
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "execute_bash",
+            "description": "在本地终端执行一条 bash 命令并返回输出结果",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "要执行的 bash 命令"}
+                },
+                "required": ["command"]
+            }
+        }
+    }
+]
+
+
 # Bash 工具的实际执行函数
 def execute_bash(command: str) -> str:
     try:
